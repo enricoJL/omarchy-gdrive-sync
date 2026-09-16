@@ -6,7 +6,7 @@
   "author": "Enrico Lévesque",
   "license": "MIT",
   "repository": "https://github.com/enricojl/omarchy-gdrive-sync",
-  "description": "Two-way Google Drive sync with rclone bisync: bar status, live progress, visible problems, folder picker. (UI in French)",
+  "description": "Two-way Google Drive sync with rclone bisync: bar status, live progress, visible problems, folder picker.",
   "kinds": [
     "bar-widget"
   ],
@@ -15,7 +15,7 @@
   },
   "barWidget": {
     "displayName": "Google Drive",
-    "description": "Indicateur de synchronisation Google Drive (rclone bisync) avec panneau de suivi et de contrôle.",
+    "description": "Google Drive sync indicator (rclone bisync) with a monitoring and control panel.",
     "category": "Files",
     "allowMultiple": false,
     "defaultSection": "right",
@@ -29,19 +29,19 @@
       {
         "key": "remote",
         "type": "string",
-        "label": "Distant rclone (ex. gdrive: ou gdrive:Dossier)",
+        "label": "rclone remote (e.g. gdrive: or gdrive:Folder)",
         "defaultValue": "gdrive:"
       },
       {
         "key": "localDir",
         "type": "string",
-        "label": "Dossier local à synchroniser",
+        "label": "Local folder to sync",
         "defaultValue": "~/GoogleDrive"
       },
       {
         "key": "intervalSec",
         "type": "integer",
-        "label": "Intervalle entre les synchronisations (secondes)",
+        "label": "Seconds between syncs",
         "min": 30,
         "max": 3600,
         "step": 30,
@@ -50,7 +50,7 @@
       {
         "key": "refreshIntervalSec",
         "type": "integer",
-        "label": "Rafraîchissement de l'état (secondes)",
+        "label": "Status refresh interval (seconds)",
         "min": 5,
         "max": 300,
         "step": 5,

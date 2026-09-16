@@ -58,30 +58,30 @@ function isProblem(state) {
 function headline(s, nowMs) {
   var state = stateOf(s)
   switch (state) {
-  case "loading": return "Lecture de l'état…"
-  case "unavailable": return "rclone n'est pas installé"
-  case "unconfigured": return "Distant rclone non configuré"
-  case "missing-folder": return "Dossier local introuvable"
-  case "resyncing": return "Resynchronisation en cours…"
+  case "loading": return "Reading status…"
+  case "unavailable": return "rclone is not installed"
+  case "unconfigured": return "rclone remote not configured"
+  case "missing-folder": return "Local folder not found"
+  case "resyncing": return "Resyncing…"
   case "running": return runningLine(s)
-  case "needs-resync": return "Resynchronisation requise"
-  case "error": return "Dernière synchronisation échouée"
-  case "paused": return "Synchronisation en pause"
-  case "never": return "Aucune synchronisation encore"
-  case "warning": return "Synchronisé avec avertissements · " + relativeTime(s.lastRun.endedAt, nowMs)
-  default: return "À jour · " + relativeTime(s.lastRun.endedAt, nowMs)
+  case "needs-resync": return "Resync required"
+  case "error": return "Last sync failed"
+  case "paused": return "Sync paused"
+  case "never": return "No sync yet"
+  case "warning": return "Synced with warnings · " + relativeTime(s.lastRun.endedAt, nowMs)
+  default: return "Up to date · " + relativeTime(s.lastRun.endedAt, nowMs)
   }
 }
 
 function runningLine(s) {
   var p = s.current ? s.current.progress : null
-  if (!p) return "Synchronisation en cours… (analyse)"
+  if (!p) return "Syncing… (scanning)"
   var parts = []
   var active = p.transferring ? p.transferring.length : 0
-  if (active > 0) parts.push(active + (active > 1 ? " fichiers" : " fichier"))
+  if (active > 0) parts.push(active + (active > 1 ? " files" : " file"))
   if (p.speed > 0) parts.push(formatSpeed(p.speed))
-  if (parts.length === 0) return "Synchronisation en cours… (comparaison)"
-  return "Transfert · " + parts.join(" · ")
+  if (parts.length === 0) return "Syncing… (comparing)"
+  return "Transferring · " + parts.join(" · ")
 }
 
 function tooltip(s, nowMs) {
@@ -90,15 +90,15 @@ function tooltip(s, nowMs) {
 
 function formatBytes(bytes) {
   var value = Number(bytes || 0)
-  if (!isFinite(value) || value <= 0) return "0 o"
-  var units = ["o", "ko", "Mo", "Go", "To"]
+  if (!isFinite(value) || value <= 0) return "0 B"
+  var units = ["B", "kB", "MB", "GB", "TB"]
   var index = 0
   while (value >= 1000 && index < units.length - 1) {
     value = value / 1000
     index++
   }
   var decimals = value >= 100 || index === 0 ? 0 : (value >= 10 ? 1 : 2)
-  return value.toFixed(decimals).replace(".", ",").replace(/,0+$/, "").replace(/(,\d)0$/, "$1") + " " + units[index]
+  return value.toFixed(decimals).replace(/\.0+$/, "").replace(/(\.\d)0$/, "$1") + " " + units[index]
 }
 
 function formatSpeed(bytesPerSec) {
@@ -107,13 +107,13 @@ function formatSpeed(bytesPerSec) {
 
 function formatDuration(sec) {
   var s = Math.max(0, Math.round(Number(sec || 0)))
-  if (s < 60) return s + " s"
+  if (s < 60) return s + "s"
   var m = Math.floor(s / 60)
   s = s % 60
-  if (m < 60) return m + " min" + (s > 0 ? " " + (s < 10 ? "0" : "") + s + " s" : "")
+  if (m < 60) return m + "m" + (s > 0 ? " " + (s < 10 ? "0" : "") + s + "s" : "")
   var h = Math.floor(m / 60)
   m = m % 60
-  return h + " h " + (m < 10 ? "0" : "") + m
+  return h + "h " + (m < 10 ? "0" : "") + m + "m"
 }
 
 function formatEta(sec) {
@@ -125,17 +125,17 @@ function formatEta(sec) {
 
 function relativeTime(timestampSec, nowMs) {
   var ts = Number(timestampSec || 0)
-  if (!isFinite(ts) || ts <= 0) return "jamais"
+  if (!isFinite(ts) || ts <= 0) return "never"
   var now = nowMs === undefined ? Date.now() : Number(nowMs)
   var diff = Math.max(0, Math.floor((now - ts * 1000) / 1000))
-  if (diff < 45) return "à l'instant"
+  if (diff < 45) return "just now"
   var minutes = Math.round(diff / 60)
-  if (minutes < 60) return "il y a " + minutes + " min"
+  if (minutes < 60) return minutes + " min ago"
   var hours = Math.floor(minutes / 60)
-  if (hours < 24) return "il y a " + hours + " h"
+  if (hours < 24) return hours + "h ago"
   var days = Math.floor(hours / 24)
-  if (days < 30) return "il y a " + days + " j"
-  return "il y a " + Math.floor(days / 30) + " mois"
+  if (days < 30) return days + "d ago"
+  return Math.floor(days / 30) + "mo ago"
 }
 
 function inTime(timestampSec, nowMs) {
@@ -143,8 +143,8 @@ function inTime(timestampSec, nowMs) {
   if (!isFinite(ts) || ts <= 0) return ""
   var now = nowMs === undefined ? Date.now() : Number(nowMs)
   var diff = Math.round((ts * 1000 - now) / 1000)
-  if (diff <= 5) return "imminente"
-  return "dans " + formatDuration(diff)
+  if (diff <= 5) return "imminent"
+  return "in " + formatDuration(diff)
 }
 
 function formatClock(timestampSec) {
@@ -185,11 +185,11 @@ function fileLabel(file) {
 
 function actionLabel(action) {
   var a = String(action || "")
-  if (a.indexOf("Copied (new)") === 0) return "nouveau"
-  if (a.indexOf("Copied") === 0) return "mis à jour"
-  if (a.indexOf("Deleted") === 0 || a.indexOf("Removed") === 0) return "supprimé"
-  if (a.indexOf("Updated modification time") === 0) return "date modifiée"
-  if (a.indexOf("Moved") === 0 || a.indexOf("Renamed") === 0) return "déplacé"
+  if (a.indexOf("Copied (new)") === 0) return "new"
+  if (a.indexOf("Copied") === 0) return "updated"
+  if (a.indexOf("Deleted") === 0 || a.indexOf("Removed") === 0) return "deleted"
+  if (a.indexOf("Updated modification time") === 0) return "mtime updated"
+  if (a.indexOf("Moved") === 0 || a.indexOf("Renamed") === 0) return "moved"
   return a
 }
 
@@ -199,7 +199,7 @@ function countsSummary(counts) {
   if (counts.uploaded) parts.push("↑ " + counts.uploaded)
   if (counts.downloaded) parts.push("↓ " + counts.downloaded)
   if (counts.deleted) parts.push("✕ " + counts.deleted)
-  return parts.length ? parts.join("  ") : "aucun changement"
+  return parts.length ? parts.join("  ") : "no changes"
 }
 
 function errorText(err) {

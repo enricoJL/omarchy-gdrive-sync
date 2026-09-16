@@ -86,7 +86,7 @@ Item {
   function applyStatus(raw) {
     var parsed = Model.parseStatus(raw)
     if (!parsed) {
-      helperError = "Impossible de lire l'état de la synchronisation"
+      helperError = "Could not read sync status"
       return
     }
     status = parsed
@@ -120,11 +120,11 @@ Item {
     if (label) flash(label)
   }
 
-  function syncNow() { control("sync-now", "Synchronisation lancée") }
-  function resync() { control("resync", "Resynchronisation lancée") }
-  function cancel() { control("cancel", "Annulation…") }
-  function pause() { control("pause", "Synchronisation en pause") }
-  function resume() { control("resume", "Synchronisation reprise") }
+  function syncNow() { control("sync-now", "Sync started") }
+  function resync() { control("resync", "Resync started") }
+  function cancel() { control("cancel", "Cancelling…") }
+  function pause() { control("pause", "Sync paused") }
+  function resume() { control("resume", "Sync resumed") }
   function toggleTimer() { timerEnabled ? pause() : resume() }
 
   function openFolder() {
@@ -200,7 +200,7 @@ Item {
     onExited: function(exitCode) {
       root.refreshing = false
       if (exitCode === 0) root.applyStatus(statusStdout.text)
-      else root.helperError = root.elide(statusStderr.text || statusStdout.text || "Échec de lecture de l'état")
+      else root.helperError = root.elide(statusStderr.text || statusStdout.text || "Failed to read status")
     }
   }
 
@@ -212,7 +212,7 @@ Item {
     stderr: StdioCollector { id: applyStderr; waitForEnd: true }
     onExited: function(exitCode) {
       if (exitCode === 0) root.applyStatus(applyStdout.text)
-      else root.helperError = root.elide(applyStderr.text || "Échec de l'application des réglages")
+      else root.helperError = root.elide(applyStderr.text || "Failed to apply settings")
       if (root.applyPending) {
         root.applyPending = false
         root.applySettings()
@@ -229,7 +229,7 @@ Item {
     stderr: StdioCollector { id: controlStderr; waitForEnd: true }
     onExited: function(exitCode) {
       if (exitCode !== 0) {
-        root.helperError = root.elide(controlStderr.text || controlStdout.text || "La commande a échoué")
+        root.helperError = root.elide(controlStderr.text || controlStdout.text || "Command failed")
         root.flash(root.helperError)
       }
       delayedRefresh.restart()
@@ -269,11 +269,11 @@ Item {
       if (exitCode === 0) {
         root.applyStatus(out)
         root.browsing = false
-        root.flash("Dossier : " + Model.shortenPath(setFolderProcess.target, root.home))
+        root.flash("Folder: " + Model.shortenPath(setFolderProcess.target, root.home))
         persistProcess.command = ["omarchy", "bar", "set", root.moduleName, "localDir", setFolderProcess.target]
         persistProcess.running = root.moduleName !== ""
       } else {
-        var message = "Impossible de choisir ce dossier"
+        var message = "Could not select this folder"
         try { message = JSON.parse(out).error || message } catch (e) {}
         root.flash(message)
       }
@@ -286,7 +286,7 @@ Item {
     command: []
     stderr: StdioCollector { id: persistStderr; waitForEnd: true }
     onExited: function(exitCode) {
-      if (exitCode !== 0) root.helperError = root.elide("Réglage non persisté dans shell.json : " + persistStderr.text)
+      if (exitCode !== 0) root.helperError = root.elide("Setting not persisted to shell.json: " + persistStderr.text)
     }
   }
 }

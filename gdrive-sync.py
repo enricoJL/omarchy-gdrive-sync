@@ -421,12 +421,12 @@ def finish_run(result, previous):
     rotate_logs()
     was_ok = previous is None or bool(previous.get("ok"))
     if not result["ok"] and was_ok:
-        body = result.get("headline") or "Consultez le panneau Google Drive dans la barre."
+        body = result.get("headline") or "Open the Google Drive panel in the bar for details."
         if result.get("needsResync"):
-            body = "Une resynchronisation est requise. " + body
-        notify("Synchronisation Google Drive échouée", body, "critical")
+            body = "A resync is required. " + body
+        notify("Google Drive sync failed", body, "critical")
     elif result["ok"] and previous is not None and not previous.get("ok"):
-        notify("Synchronisation Google Drive rétablie", "La synchronisation fonctionne de nouveau.")
+        notify("Google Drive sync restored", "Syncing is working again.")
 
 
 def cmd_run(args):
@@ -452,11 +452,11 @@ def cmd_run(args):
     remote_name = cfg["remote"].split(":", 1)[0] + ":"
     failure = ""
     if shutil.which("rclone") is None:
-        failure = "rclone n'est pas installé"
+        failure = "rclone is not installed"
     elif remote_name not in rclone_remotes():
-        failure = f"Le distant rclone « {remote_name} » n'existe pas (rclone config)"
+        failure = f"rclone remote \"{remote_name}\" does not exist (run rclone config)"
     elif not local.is_dir():
-        failure = f"Dossier local introuvable : {local}"
+        failure = f"Local folder not found: {local}"
     if failure:
         ended = time.time()
         finish_run({
@@ -493,9 +493,9 @@ def cmd_run(args):
 
     summary = parse_log(log_path)
     if code != 0 and not summary["headline"]:
-        summary["headline"] = f"rclone s'est terminé avec le code {code}"
+        summary["headline"] = f"rclone exited with code {code}"
     if code < 0:
-        summary["headline"] = "Synchronisation annulée"
+        summary["headline"] = "Sync cancelled"
     result = {
         "startedAt": started, "endedAt": ended, "durationSec": ended - started,
         "exitCode": code, "ok": code == 0, "resync": resync, "log": str(log_path),
@@ -540,10 +540,10 @@ def cmd_set_folder(args):
             try:
                 target.mkdir(parents=True, exist_ok=True)
             except OSError as exc:
-                print(json.dumps({"ok": False, "error": f"Impossible de créer le dossier : {exc}"}))
+                print(json.dumps({"ok": False, "error": f"Could not create folder: {exc}"}))
                 return 1
         else:
-            print(json.dumps({"ok": False, "error": "Le dossier n'existe pas"}))
+            print(json.dumps({"ok": False, "error": "The folder does not exist"}))
             return 1
     cfg = load_config()
     cfg["localDir"] = str(target.resolve())

@@ -8,8 +8,6 @@ live progress, visible problems, and a folder picker.
 
 ![Panel screenshot](assets/screenshot.png)
 
-> The user interface is currently in French. Contributions to add other languages are welcome.
-
 ## Features
 
 - **Bar indicator**: Drive triangle icon — red with a dot when something needs attention, pulsing while
@@ -49,7 +47,7 @@ omarchy plugin add https://github.com/enricojl/omarchy-gdrive-sync.git --enable
 
 Enabling the plugin creates and starts the `systemd --user` units (`gdrive-sync.timer` / `gdrive-sync.service`).
 The first run requires a *resync* (a `rclone bisync` requirement): the panel shows a banner with a
-"Resynchroniser maintenant" button. Resync copies files that exist on only one side to the other side
+"Resync now" button. Resync copies files that exist on only one side to the other side
 (nothing is deleted) and lets the newer file win when both differ (`--resync-mode newer`).
 
 Update with `omarchy plugin update com.github.enricojl.gdrive-sync`; remove with

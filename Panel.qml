@@ -44,34 +44,34 @@ Panel {
   readonly property var actions: {
     var list = []
     var canSync = sync.usable && sync.status.localDirExists && !sync.running && !sync.busy
-    if (sync.running) list.push({ key: "cancel", icon: "", label: "Annuler la synchronisation", hint: "c", enabled: !sync.busy })
-    else list.push({ key: "sync", icon: "", label: "Synchroniser maintenant", hint: "s", enabled: canSync })
+    if (sync.running) list.push({ key: "cancel", icon: "", label: "Cancel sync", hint: "c", enabled: !sync.busy })
+    else list.push({ key: "sync", icon: "", label: "Sync now", hint: "s", enabled: canSync })
     if (!sync.running && (sync.needsResync || state === "error")) {
-      list.push({ key: "resync", icon: "", label: "Resynchroniser (--resync)", hint: "r", enabled: canSync })
+      list.push({ key: "resync", icon: "", label: "Resync (--resync)", hint: "r", enabled: canSync })
     }
-    list.push({ key: "open", icon: "", label: "Ouvrir le dossier local", hint: "o", enabled: sync.status.localDirExists })
-    list.push({ key: "folder", icon: "", label: "Choisir le dossier à synchroniser…", hint: "f", enabled: !sync.busy })
+    list.push({ key: "open", icon: "", label: "Open local folder", hint: "o", enabled: sync.status.localDirExists })
+    list.push({ key: "folder", icon: "", label: "Choose folder to sync…", hint: "f", enabled: !sync.busy })
     return list
   }
 
   readonly property string problemTitle: {
     switch (state) {
-    case "unavailable": return "rclone est introuvable"
-    case "unconfigured": return "Distant « " + sync.remote + " » absent de la configuration rclone"
-    case "missing-folder": return "Le dossier local n'existe pas"
-    case "needs-resync": return "Resynchronisation requise"
-    case "error": return "La dernière synchronisation a échoué"
+    case "unavailable": return "rclone is not installed"
+    case "unconfigured": return "Remote \"" + sync.remote + "\" is missing from the rclone config"
+    case "missing-folder": return "The local folder does not exist"
+    case "needs-resync": return "Resync required"
+    case "error": return "The last sync failed"
     default: return ""
     }
   }
   readonly property string problemDetail: {
     switch (state) {
-    case "unavailable": return "Installez-le avec : omarchy pkg add rclone"
-    case "unconfigured": return "Lancez « rclone config » dans un terminal pour créer le distant Google Drive."
-    case "missing-folder": return Model.shortenPath(sync.configuredDir, sync.home) + " — choisissez un autre dossier ou créez-le."
+    case "unavailable": return "Install it with: omarchy pkg add rclone"
+    case "unconfigured": return "Run \"rclone config\" in a terminal to create the Google Drive remote."
+    case "missing-folder": return Model.shortenPath(sync.configuredDir, sync.home) + " — pick another folder or create it."
     case "needs-resync":
-      return "rclone bisync doit reconstruire ses listes (première synchronisation, changement de dossier ou erreur critique). " +
-             "La resynchronisation fusionne les deux côtés : les fichiers présents d'un seul côté sont copiés, le plus récent l'emporte en cas de différence."
+      return "rclone bisync must rebuild its listings (first sync, folder change or critical error). " +
+             "Resync merges both sides: files present on one side only are copied over, and the newer file wins when both differ."
     case "error": return sync.lastRun && sync.lastRun.headline ? sync.lastRun.headline : ""
     default: return ""
     }
@@ -305,7 +305,7 @@ Panel {
 
                 PanelToolTip {
                   visible: timerSwitch.containsMouse
-                  text: sync.timerEnabled ? "Mettre en pause la synchronisation automatique" : "Reprendre la synchronisation automatique"
+                  text: sync.timerEnabled ? "Pause automatic sync" : "Resume automatic sync"
                   fontFamily: hero.fontFamily
                 }
               }
@@ -376,7 +376,7 @@ Panel {
 
               Button {
                 visible: root.state === "needs-resync" || root.state === "error"
-                text: root.state === "needs-resync" ? "Resynchroniser maintenant" : "Réessayer"
+                text: root.state === "needs-resync" ? "Resync now" : "Retry"
                 iconText: ""
                 bordered: true
                 foreground: root.foreground
@@ -387,7 +387,7 @@ Panel {
 
               Button {
                 visible: root.state === "missing-folder"
-                text: "Choisir un dossier…"
+                text: "Choose a folder…"
                 iconText: ""
                 bordered: true
                 foreground: root.foreground
@@ -404,7 +404,7 @@ Panel {
             spacing: Style.space(6)
 
             PanelSectionHeader {
-              text: sync.status.current && sync.status.current.resync ? "RESYNCHRONISATION EN COURS" : "SYNCHRONISATION EN COURS"
+              text: sync.status.current && sync.status.current.resync ? "RESYNC IN PROGRESS" : "SYNC IN PROGRESS"
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
@@ -442,15 +442,15 @@ Panel {
               text: {
                 var p = sync.progress
                 var elapsed = sync.status.current ? Model.formatDuration(sync.status.current.elapsedSec) : ""
-                if (!p) return "Analyse des deux côtés… · " + elapsed
+                if (!p) return "Scanning both sides… · " + elapsed
                 var parts = []
                 if (p.totalBytes > 0) parts.push(Model.formatBytes(p.bytes) + " / " + Model.formatBytes(p.totalBytes))
-                if (p.totalTransfers > 0) parts.push(p.transfers + "/" + p.totalTransfers + " fichiers")
-                if (p.totalChecks > 0) parts.push(p.checks + "/" + p.totalChecks + " vérifiés")
+                if (p.totalTransfers > 0) parts.push(p.transfers + "/" + p.totalTransfers + " files")
+                if (p.totalChecks > 0) parts.push(p.checks + "/" + p.totalChecks + " checked")
                 if (p.speed > 0) parts.push(Model.formatSpeed(p.speed))
                 var eta = Model.formatEta(p.eta)
                 if (eta) parts.push(eta)
-                if (p.errors > 0) parts.push(p.errors + " erreur" + (p.errors > 1 ? "s" : ""))
+                if (p.errors > 0) parts.push(p.errors + " error" + (p.errors > 1 ? "s" : ""))
                 parts.push(elapsed)
                 return parts.join(" · ")
               }
@@ -492,18 +492,18 @@ Panel {
             width: parent.width
             spacing: Style.spacing.labelGap
 
-            InfoPair { label: "Dossier local"; value: Model.shortenPath(sync.configuredDir, sync.home) }
-            InfoPair { label: "Distant"; value: sync.status.config && sync.status.config.remote ? sync.status.config.remote : sync.remote }
-            InfoPair { label: "Intervalle"; value: "toutes les " + Model.formatDuration(sync.status.config && sync.status.config.intervalSec ? sync.status.config.intervalSec : sync.intervalSec) }
+            InfoPair { label: "Local folder"; value: Model.shortenPath(sync.configuredDir, sync.home) }
+            InfoPair { label: "Remote"; value: sync.status.config && sync.status.config.remote ? sync.status.config.remote : sync.remote }
+            InfoPair { label: "Interval"; value: "every " + Model.formatDuration(sync.status.config && sync.status.config.intervalSec ? sync.status.config.intervalSec : sync.intervalSec) }
             InfoPair {
               visible: sync.timerEnabled && !sync.running
-              label: "Prochaine synchro"
-              value: sync.status.nextRunAt ? Model.inTime(sync.status.nextRunAt, root.nowMs) : "en attente"
+              label: "Next sync"
+              value: sync.status.nextRunAt ? Model.inTime(sync.status.nextRunAt, root.nowMs) : "waiting"
             }
             InfoPair {
               visible: !!sync.lastRun
-              label: "Dernière synchro"
-              value: sync.lastRun ? Model.formatClock(sync.lastRun.endedAt) + " · " + Model.formatDuration(sync.lastRun.durationSec) + " · " + (sync.lastRun.ok ? Model.countsSummary(sync.lastRun.counts) : "échec") : ""
+              label: "Last sync"
+              value: sync.lastRun ? Model.formatClock(sync.lastRun.endedAt) + " · " + Model.formatDuration(sync.lastRun.durationSec) + " · " + (sync.lastRun.ok ? Model.countsSummary(sync.lastRun.counts) : "failed") : ""
             }
           }
 
@@ -533,7 +533,7 @@ Panel {
             spacing: Style.space(6)
 
             PanelSectionHeader {
-              text: "PROBLÈMES (" + root.errors.length + ")"
+              text: "PROBLEMS (" + root.errors.length + ")"
               foreground: root.urgent
               fontFamily: root.fontFamily
             }
@@ -559,7 +559,7 @@ Panel {
               visible: root.errors.length > 8
               width: parent.width
               textFormat: Text.PlainText
-              text: "… et " + (root.errors.length - 8) + " autres (voir " + (sync.lastRun ? Model.shortenPath(sync.lastRun.log, sync.home) : "le journal") + ")"
+              text: "… and " + (root.errors.length - 8) + " more (see " + (sync.lastRun ? Model.shortenPath(sync.lastRun.log, sync.home) : "the log") + ")"
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -574,7 +574,7 @@ Panel {
             spacing: Style.space(6)
 
             PanelSectionHeader {
-              text: "AVERTISSEMENTS"
+              text: "WARNINGS"
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
@@ -603,7 +603,7 @@ Panel {
             spacing: Style.space(4)
 
             PanelSectionHeader {
-              text: sync.running ? "FICHIERS TRAITÉS" : "DERNIERS FICHIERS SYNCHRONISÉS"
+              text: sync.running ? "FILES PROCESSED" : "RECENTLY SYNCED FILES"
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
@@ -655,7 +655,7 @@ Panel {
             spacing: Style.space(4)
 
             PanelSectionHeader {
-              text: "HISTORIQUE"
+              text: "HISTORY"
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
@@ -685,7 +685,7 @@ Panel {
                   Layout.fillWidth: true
                   textFormat: Text.PlainText
                   text: (modelData.resync ? "resync · " : "") + Model.formatDuration(modelData.durationSec) + " · "
-                        + (modelData.ok ? Model.countsSummary(modelData.counts) : (modelData.headline || "échec"))
+                        + (modelData.ok ? Model.countsSummary(modelData.counts) : (modelData.headline || "failed"))
                   color: root.dim
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
@@ -698,7 +698,7 @@ Panel {
           Text {
             width: parent.width
             textFormat: Text.PlainText
-            text: "s synchroniser · p pause/reprise · o ouvrir · f dossier" + (sync.needsResync || root.state === "error" ? " · r resync" : "")
+            text: "s sync · p pause/resume · o open · f folder" + (sync.needsResync || root.state === "error" ? " · r resync" : "")
             color: root.dim
             opacity: 0.7
             font.family: root.fontFamily
@@ -716,7 +716,7 @@ Panel {
           spacing: Style.space(10)
 
           PanelSectionHeader {
-            text: "CHOISIR LE DOSSIER À SYNCHRONISER"
+            text: "CHOOSE THE FOLDER TO SYNC"
             foreground: root.foreground
             fontFamily: root.fontFamily
           }
@@ -725,7 +725,7 @@ Panel {
             id: pathField
             width: parent.width
             text: sync.browse.path || ""
-            placeholderText: "/chemin/du/dossier"
+            placeholderText: "/path/to/folder"
             foreground: root.foreground
             font.family: root.fontFamily
             onAccepted: sync.chooseFolder(text)
@@ -735,7 +735,7 @@ Panel {
           Text {
             width: parent.width
             textFormat: Text.PlainText
-            text: "Entrez un chemin puis Entrée, ou naviguez ci-dessous. Le dossier est créé s'il n'existe pas."
+            text: "Type a path and press Enter, or browse below. The folder is created if it does not exist."
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -750,7 +750,7 @@ Panel {
             DirRow {
               visible: sync.browse.parent !== ""
               width: parent.width
-              name: ".. (dossier parent)"
+              name: ".. (parent folder)"
               glyph: ""
               rowIndex: -1
               onActivated: sync.browseUp()
@@ -773,7 +773,7 @@ Panel {
               visible: (!sync.browse.dirs || sync.browse.dirs.length === 0) && !sync.browseLoading
               width: parent.width
               textFormat: Text.PlainText
-              text: "Aucun sous-dossier"
+              text: "No subfolders"
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -787,7 +787,7 @@ Panel {
 
             Button {
               Layout.fillWidth: true
-              text: "Utiliser " + (sync.browse.path ? Model.basename(sync.browse.path) || "/" : "ce dossier")
+              text: "Use " + (sync.browse.path ? Model.basename(sync.browse.path) || "/" : "this folder")
               iconText: ""
               bordered: true
               foreground: root.foreground
@@ -797,7 +797,7 @@ Panel {
             }
 
             Button {
-              text: "Annuler"
+              text: "Cancel"
               bordered: true
               foreground: root.foreground
               fontFamily: root.fontFamily
@@ -808,7 +808,7 @@ Panel {
           Text {
             width: parent.width
             textFormat: Text.PlainText
-            text: "Changer de dossier entraîne une resynchronisation (--resync) au prochain passage."
+            text: "Changing the folder requires a resync (--resync) on the next run."
             color: root.dim
             opacity: 0.7
             font.family: root.fontFamily

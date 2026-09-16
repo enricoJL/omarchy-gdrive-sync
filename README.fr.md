@@ -1,5 +1,7 @@
 # Google Drive pour Omarchy
 
+*[English version](README.md)* — l'interface du plugin est en anglais.
+
 Plugin Omarchy (`com.github.enricojl.gdrive-sync`) qui remplace « Google Drive pour ordinateur » sur Arch/Omarchy :
 synchronisation bidirectionnelle entre Google Drive et un dossier local avec `rclone bisync`,
 indicateur dans la barre, suivi en direct, problèmes visibles, choix du dossier.
