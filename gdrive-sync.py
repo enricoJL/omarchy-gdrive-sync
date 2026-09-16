@@ -27,6 +27,12 @@ LOCK_FILE = STATE_DIR / "run.lock"
 LOG_DIR = STATE_DIR / "logs"
 UNIT_DIR = HOME / ".config" / "systemd" / "user"
 UNIT = "gdrive-sync"
+WATCH_UNIT = "gdrive-sync-watch"
+WATCH_STATE_FILE = STATE_DIR / "watch.json"
+WATCH_DEBOUNCE_SEC = 5
+WATCH_MAX_WAIT_SEC = 30
+# Hidden entries (e.g. .obsidian/workspace.json) change constantly; they still sync on the timer.
+WATCH_EXCLUDE = r"(/\.|\.partial$|~$|\.swp$|\.tmp$|\.crdownload$)"
 RC_ADDR = "127.0.0.1:5573"
 BISYNC_CACHE = Path(os.environ.get("XDG_CACHE_HOME", HOME / ".cache")) / "rclone" / "bisync"
 
@@ -40,7 +46,8 @@ MAX_FILES = 40
 DEFAULT_CONFIG = {
     "remote": "gdrive:",
     "localDir": str(HOME / "GoogleDrive"),
-    "intervalSec": 60,
+    "intervalSec": 300,
+    "watchLocal": True,
     "extraArgs": ["--drive-skip-gdocs"],
 }
 
@@ -81,7 +88,19 @@ def load_config():
         cfg["intervalSec"] = max(30, min(3600, int(cfg["intervalSec"])))
     except (TypeError, ValueError):
         cfg["intervalSec"] = DEFAULT_CONFIG["intervalSec"]
+    cfg["watchLocal"] = parse_bool(cfg["watchLocal"], True)
     return cfg
+
+
+def parse_bool(value, fallback):
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in ("true", "1", "yes", "on"):
+        return True
+    if text in ("false", "0", "no", "off"):
+        return False
+    return fallback
 
 
 def save_config(cfg):
@@ -240,7 +259,12 @@ def parse_log(path):
                     warnings.append(entry)
                     warning_index[msg] = entry
             elif level == "info" and obj and msg.startswith(FILE_ACTIONS):
-                direction = "down" if "local" in str(rec.get("objectType", "")) else "up"
+                is_local = "local" in str(rec.get("objectType", ""))
+                # "Copied" logs the source object; the other actions log the affected object.
+                if msg.startswith("Copied"):
+                    direction = "up" if is_local else "down"
+                else:
+                    direction = "down" if is_local else "up"
                 if msg.startswith(("Deleted", "Removed")):
                     counts["deleted"] += 1
                 elif msg.startswith("Copied"):
@@ -323,7 +347,19 @@ def unit_texts(interval):
         "[Install]\n"
         "WantedBy=timers.target\n"
     )
-    return service, timer
+    watcher = (
+        "[Unit]\n"
+        "Description=Google Drive sync local watcher (inotify)\n\n"
+        "[Service]\n"
+        "Type=simple\n"
+        f"ExecStart=/usr/bin/python3 {helper} watch\n"
+        "Restart=on-failure\n"
+        "RestartSec=10\n"
+        "Nice=10\n\n"
+        "[Install]\n"
+        "WantedBy=default.target\n"
+    )
+    return service, timer, watcher
 
 
 def write_if_changed(path, text):
@@ -337,19 +373,28 @@ def write_if_changed(path, text):
     return True
 
 
-def ensure_units(interval, enable=True):
-    service_text, timer_text = unit_texts(interval)
-    service_path = UNIT_DIR / f"{UNIT}.service"
-    timer_path = UNIT_DIR / f"{UNIT}.timer"
-    changed = write_if_changed(service_path, service_text)
-    changed = write_if_changed(timer_path, timer_text) or changed
-    if changed:
+def ensure_units(cfg, enable=True, restart_watch=False):
+    service_text, timer_text, watcher_text = unit_texts(cfg["intervalSec"])
+    changed = write_if_changed(UNIT_DIR / f"{UNIT}.service", service_text)
+    changed = write_if_changed(UNIT_DIR / f"{UNIT}.timer", timer_text) or changed
+    watch_changed = write_if_changed(UNIT_DIR / f"{WATCH_UNIT}.service", watcher_text)
+    if changed or watch_changed:
         systemctl("daemon-reload")
+
     props = unit_props(f"{UNIT}.timer", ["UnitFileState", "ActiveState"])
     if enable and props.get("UnitFileState") != "enabled":
         systemctl("enable", "--now", f"{UNIT}.timer")
     elif changed and props.get("ActiveState") == "active":
         systemctl("restart", f"{UNIT}.timer")
+
+    watch = unit_props(f"{WATCH_UNIT}.service", ["UnitFileState", "ActiveState"])
+    if enable and cfg["watchLocal"]:
+        if watch.get("UnitFileState") != "enabled" or watch.get("ActiveState") != "active":
+            systemctl("enable", "--now", f"{WATCH_UNIT}.service")
+        elif watch_changed or restart_watch:
+            systemctl("restart", f"{WATCH_UNIT}.service")
+    elif watch.get("ActiveState") == "active" or watch.get("UnitFileState") == "enabled":
+        systemctl("disable", "--now", f"{WATCH_UNIT}.service")
     return changed
 
 
@@ -362,6 +407,9 @@ def cmd_status(_args):
     local = Path(cfg["localDir"])
     timer = unit_props(f"{UNIT}.timer", ["LoadState", "UnitFileState", "ActiveState"])
     service = unit_props(f"{UNIT}.service", ["ActiveState", "SubState"])
+    watcher = unit_props(f"{WATCH_UNIT}.service", ["ActiveState"])
+    watch_state = read_json(WATCH_STATE_FILE) or {}
+    watcher_active = watcher.get("ActiveState") == "active" and pid_alive(watch_state.get("pid"))
 
     current = read_json(CURRENT_FILE)
     running = bool(current) and pid_alive(current.get("pid"))
@@ -401,9 +449,93 @@ def cmd_status(_args):
         "lastRun": last,
         "needsResync": needs_resync,
         "nextRunAt": next_run,
+        "watchLocal": cfg["watchLocal"],
+        "watcherActive": watcher_active,
+        "watch": {
+            "events": watch_state.get("events", 0),
+            "triggers": watch_state.get("triggers", 0),
+            "lastEventAt": watch_state.get("lastEventAt"),
+            "lastTriggerAt": watch_state.get("lastTriggerAt"),
+            "error": watch_state.get("error", "") if not watcher_active else "",
+        },
         "history": read_history(HISTORY_SHOW),
     }, ensure_ascii=False))
     return 0
+
+
+# ---------------------------------------------------------------- local watcher
+
+def cmd_watch(_args):
+    import select
+
+    cfg = load_config()
+    local = Path(cfg["localDir"])
+    state = {"pid": os.getpid(), "startedAt": time.time(), "localDir": str(local),
+             "events": 0, "triggers": 0, "lastEventAt": None, "lastTriggerAt": None, "error": ""}
+
+    def save(error=""):
+        state["error"] = error
+        write_json(WATCH_STATE_FILE, state)
+
+    exe = shutil.which("inotifywait")
+    if not exe:
+        save("inotifywait not found (install inotify-tools)")
+        return 1
+    if not local.is_dir():
+        save(f"Local folder not found: {local}")
+        return 1
+
+    proc = subprocess.Popen(
+        [exe, "-m", "-r", "-q", "-e", "close_write,create,delete,move,attrib",
+         "--exclude", WATCH_EXCLUDE, "--format", "%w%f", str(local)],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1,
+    )
+    save()
+
+    def stop(_signum, _frame):
+        proc.terminate()
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+
+    first_at = None
+    last_at = None
+    while True:
+        if first_at is None:
+            timeout = None
+        else:
+            now = time.time()
+            timeout = max(0.1, min(WATCH_DEBOUNCE_SEC - (now - last_at), WATCH_MAX_WAIT_SEC - (now - first_at)))
+        ready, _, _ = select.select([proc.stdout], [], [], timeout)
+        if ready:
+            line = proc.stdout.readline()
+            if line == "":
+                err = proc.stderr.read().strip().splitlines()
+                save(err[-1] if err else "inotifywait exited unexpectedly")
+                return 1
+            # Changes made by the sync itself arrive while a run is in progress.
+            if CURRENT_FILE.exists():
+                continue
+            now = time.time()
+            state["events"] += 1
+            state["lastEventAt"] = now
+            last_at = now
+            if first_at is None:
+                first_at = now
+            continue
+
+        # Quiet period elapsed. If a sync started meanwhile, wait for it to finish
+        # so the pending local changes are picked up by a fresh run.
+        if CURRENT_FILE.exists():
+            last_at = time.time()
+            continue
+        first_at = None
+        last_at = None
+        systemctl("start", "--no-block", f"{UNIT}.service")
+        state["triggers"] += 1
+        state["lastTriggerAt"] = time.time()
+        save()
 
 
 def finish_run(result, previous):
@@ -509,6 +641,7 @@ def cmd_run(args):
 
 def cmd_apply_settings(args):
     cfg = load_config()
+    previous_dir = cfg["localDir"]
     changed = False
     if args.remote:
         remote = args.remote.strip()
@@ -527,9 +660,15 @@ def cmd_apply_settings(args):
         if interval != cfg["intervalSec"]:
             cfg["intervalSec"] = interval
             changed = True
+    if args.watch_local:
+        watch_local = parse_bool(args.watch_local, cfg["watchLocal"])
+        if watch_local != cfg["watchLocal"]:
+            cfg["watchLocal"] = watch_local
+            changed = True
+    restart_watch = cfg["localDir"] != previous_dir
     if changed or not CONFIG_FILE.exists():
         save_config(cfg)
-    ensure_units(cfg["intervalSec"], enable=not args.no_enable)
+    ensure_units(cfg, enable=not args.no_enable, restart_watch=restart_watch)
     return cmd_status(args)
 
 
@@ -546,8 +685,10 @@ def cmd_set_folder(args):
             print(json.dumps({"ok": False, "error": "The folder does not exist"}))
             return 1
     cfg = load_config()
+    restart_watch = cfg["localDir"] != str(target.resolve())
     cfg["localDir"] = str(target.resolve())
     save_config(cfg)
+    ensure_units(cfg, enable=False, restart_watch=restart_watch)
     return cmd_status(args)
 
 
@@ -599,6 +740,7 @@ def cmd_cancel(_args):
 
 
 def cmd_pause(_args):
+    systemctl("disable", "--now", f"{WATCH_UNIT}.service")
     code, _, err = systemctl("disable", "--now", f"{UNIT}.timer")
     if code != 0:
         print(err.strip(), file=sys.stderr)
@@ -607,7 +749,7 @@ def cmd_pause(_args):
 
 def cmd_resume(_args):
     cfg = load_config()
-    ensure_units(cfg["intervalSec"], enable=False)
+    ensure_units(cfg, enable=True)
     code, _, err = systemctl("enable", "--now", f"{UNIT}.timer")
     if code != 0:
         print(err.strip(), file=sys.stderr)
@@ -618,15 +760,17 @@ def cmd_install(_args):
     cfg = load_config()
     if not CONFIG_FILE.exists():
         save_config(cfg)
-    ensure_units(cfg["intervalSec"], enable=True)
-    print(f"Installed {UNIT}.service and {UNIT}.timer (every {cfg['intervalSec']}s)")
+    ensure_units(cfg, enable=True)
+    print(f"Installed {UNIT}.service, {UNIT}.timer (every {cfg['intervalSec']}s)"
+          + (f" and {WATCH_UNIT}.service" if cfg["watchLocal"] else ""))
     return 0
 
 
 def cmd_uninstall(_args):
     systemctl("disable", "--now", f"{UNIT}.timer")
+    systemctl("disable", "--now", f"{WATCH_UNIT}.service")
     systemctl("stop", f"{UNIT}.service")
-    for name in (f"{UNIT}.timer", f"{UNIT}.service"):
+    for name in (f"{UNIT}.timer", f"{UNIT}.service", f"{WATCH_UNIT}.service"):
         try:
             (UNIT_DIR / name).unlink()
         except OSError:
@@ -648,8 +792,10 @@ def main(argv):
     apply.add_argument("--remote", default="")
     apply.add_argument("--local-dir", default="")
     apply.add_argument("--interval", type=int, default=0)
+    apply.add_argument("--watch-local", default="")
     apply.add_argument("--no-enable", action="store_true")
     apply.set_defaults(func=cmd_apply_settings)
+    sub.add_parser("watch").set_defaults(func=cmd_watch)
     folder = sub.add_parser("set-folder")
     folder.add_argument("path")
     folder.add_argument("--create", action="store_true")

@@ -22,7 +22,8 @@
     "defaults": {
       "remote": "gdrive:",
       "localDir": "~/GoogleDrive",
-      "intervalSec": 60,
+      "intervalSec": 300,
+      "watchLocal": true,
       "refreshIntervalSec": 15
     },
     "schema": [
@@ -41,11 +42,17 @@
       {
         "key": "intervalSec",
         "type": "integer",
-        "label": "Seconds between syncs",
+        "label": "Seconds between Drive checks (remote changes)",
         "min": 30,
         "max": 3600,
         "step": 30,
-        "defaultValue": 60
+        "defaultValue": 300
+      },
+      {
+        "key": "watchLocal",
+        "type": "boolean",
+        "label": "Sync right after local changes (inotify)",
+        "defaultValue": true
       },
       {
         "key": "refreshIntervalSec",

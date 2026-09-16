@@ -25,6 +25,11 @@ indicateur dans la barre, suivi en direct, problèmes visibles, choix du dossier
   `~/.local/state/gdrive-sync/logs/run-*.log` (12 derniers conservés), puis écrit `last-run.json`
   et une ligne dans `history.jsonl`.
 - Pendant un passage, le panneau lit la progression en direct via l'API `rclone rc` (`127.0.0.1:5573`).
+- Avec `watchLocal`, `gdrive-sync-watch.service` exécute `inotifywait -m -r` sur le dossier local et lance
+  une synchro après 5 s de calme (30 s au maximum). Les événements produits par la synchro elle-même sont
+  ignorés, ainsi que les entrées cachées (`.obsidian/…`, `.git/…`) et les fichiers temporaires — ils sont
+  quand même synchronisés au passage du minuteur. Google Drive n'offre pas de signal équivalent : les
+  changements distants ne sont vus qu'au passage du minuteur.
 - Une notification est envoyée quand la synchronisation passe de OK à échec (et inversement).
 - La configuration du lanceur est dans `~/.config/gdrive-sync/config.json` ; elle est écrite
   automatiquement à partir des réglages du widget (`shell.json`), qui font foi.
@@ -35,7 +40,8 @@ indicateur dans la barre, suivi en direct, problèmes visibles, choix du dossier
 |---|---|---|
 | `remote` | `gdrive:` | Distant rclone (`gdrive:` ou `gdrive:SousDossier`) |
 | `localDir` | `~/GoogleDrive` | Dossier local synchronisé |
-| `intervalSec` | `60` | Intervalle entre les passages (30–3600 s) |
+| `intervalSec` | `300` | Intervalle entre les vérifications sur Drive, mesuré après la fin du passage précédent (30–3600 s). C'est le délai maximal pour voir un changement fait depuis un autre appareil. |
+| `watchLocal` | `true` | Surveille le dossier local avec inotify et synchronise quelques secondes après une modification (`omarchy bar set … watchLocal false --json` pour désactiver) |
 | `refreshIntervalSec` | `15` | Rafraîchissement de l'état quand rien ne tourne |
 
 Options rclone supplémentaires : clé `extraArgs` dans `~/.config/gdrive-sync/config.json`
@@ -47,7 +53,7 @@ Options rclone supplémentaires : clé `extraArgs` dans `~/.config/gdrive-sync/c
 - Dans le panneau : `s` synchroniser, `p` pause/reprise, `o` ouvrir le dossier, `f` choisir le dossier,
   `r` resynchroniser (quand requis), `c` annuler (pendant un passage), `Échap` fermer.
 - IPC : `omarchy-shell com.github.enricojl.gdrive-sync <toggle|syncNow|resync|pause|resume|status>`.
-- Ligne de commande : `python3 gdrive-sync.py <status|sync-now|resync|cancel|pause|resume|install|uninstall|dirs [chemin]|set-folder <chemin>>`.
+- Ligne de commande : `python3 gdrive-sync.py <status|sync-now|resync|cancel|pause|resume|install|uninstall|watch|dirs [chemin]|set-folder <chemin>>`.
 
 ## Resynchronisation
 

@@ -494,7 +494,16 @@ Panel {
 
             InfoPair { label: "Local folder"; value: Model.shortenPath(sync.configuredDir, sync.home) }
             InfoPair { label: "Remote"; value: sync.status.config && sync.status.config.remote ? sync.status.config.remote : sync.remote }
-            InfoPair { label: "Interval"; value: "every " + Model.formatDuration(sync.status.config && sync.status.config.intervalSec ? sync.status.config.intervalSec : sync.intervalSec) }
+            InfoPair { label: "Drive check"; value: "every " + Model.formatDuration(sync.status.config && sync.status.config.intervalSec ? sync.status.config.intervalSec : sync.intervalSec) }
+            InfoPair {
+              label: "Local watch"
+              value: {
+                var w = sync.status.watch || {}
+                if (!sync.status.watchLocal) return "off"
+                if (sync.status.watcherActive) return "on" + (w.lastTriggerAt ? " · triggered " + Model.relativeTime(w.lastTriggerAt, root.nowMs) : "")
+                return w.error ? "error: " + w.error : "not running"
+              }
+            }
             InfoPair {
               visible: sync.timerEnabled && !sync.running
               label: "Next sync"

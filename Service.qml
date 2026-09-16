@@ -16,8 +16,9 @@ Item {
 
   readonly property string remote: strSetting("remote", "gdrive:")
   readonly property string localDir: expandHome(strSetting("localDir", "~/GoogleDrive"))
-  readonly property int intervalSec: intSetting("intervalSec", 60, 30, 3600)
+  readonly property int intervalSec: intSetting("intervalSec", 300, 30, 3600)
   readonly property int refreshIntervalSec: intSetting("refreshIntervalSec", 15, 5, 300)
+  readonly property bool watchLocal: boolSetting("watchLocal", true)
 
   property var status: Model.defaultStatus()
   property string helperError: ""
@@ -55,6 +56,15 @@ Item {
     if (n < min) n = min
     if (n > max) n = max
     return n
+  }
+
+  function boolSetting(name, fallback) {
+    var value = setting(name, fallback)
+    if (typeof value === "boolean") return value
+    var text = String(value).trim().toLowerCase()
+    if (text === "true" || text === "1" || text === "yes" || text === "on") return true
+    if (text === "false" || text === "0" || text === "no" || text === "off") return false
+    return fallback
   }
 
   function expandHome(path) {
@@ -101,7 +111,8 @@ Item {
       "python3", helperPath, "apply-settings",
       "--remote", remote,
       "--local-dir", localDir,
-      "--interval", String(intervalSec)
+      "--interval", String(intervalSec),
+      "--watch-local", watchLocal ? "true" : "false"
     ]
     applyProcess.running = true
   }

@@ -63,7 +63,8 @@ Set from the panel (folder picker) or with `omarchy bar set com.github.enricojl.
 |---|---|---|
 | `remote` | `gdrive:` | rclone remote (`gdrive:` or `gdrive:SubFolder`) |
 | `localDir` | `~/GoogleDrive` | Local folder to sync |
-| `intervalSec` | `60` | Seconds between runs, measured after the previous run ends (30–3600) |
+| `intervalSec` | `300` | Seconds between Drive checks, measured after the previous run ends (30–3600). This is how long a change made on another device takes to show up. |
+| `watchLocal` | `true` | Watch the local folder with inotify and sync a few seconds after you change something (`omarchy bar set … watchLocal false --json` to disable) |
 | `refreshIntervalSec` | `15` | Status refresh interval while idle |
 
 Extra rclone flags live in `~/.config/gdrive-sync/config.json` under `extraArgs`
@@ -84,10 +85,14 @@ Extra rclone flags live in `~/.config/gdrive-sync/config.json` under `extraArgs`
   logs to `~/.local/state/gdrive-sync/logs/run-*.log` (last 12 kept), then writes `last-run.json`
   and appends to `history.jsonl`.
 - While a run is active, the panel reads live stats from `rclone rc` on `127.0.0.1:5573`.
+- With `watchLocal` on, `gdrive-sync-watch.service` runs `inotifywait -m -r` on the local folder and
+  starts a sync after 5 s of quiet (30 s at most). Events caused by the sync itself are ignored, as are
+  hidden entries (`.obsidian/…`, `.git/…`) and temporary files — those still sync on the timer. There is
+  no equivalent push signal from Google Drive, so remote changes are picked up by the timer only.
 - The widget settings in `shell.json` are the source of truth; the service mirrors them to
   `~/.config/gdrive-sync/config.json` for the systemd runner.
 
-CLI: `python3 gdrive-sync.py <status|sync-now|resync|cancel|pause|resume|install|uninstall|dirs [path]|set-folder <path>>`.
+CLI: `python3 gdrive-sync.py <status|sync-now|resync|cancel|pause|resume|install|uninstall|watch|dirs [path]|set-folder <path>>`.
 IPC: `omarchy-shell com.github.enricojl.gdrive-sync <toggle|syncNow|resync|pause|resume|status>`.
 
 ## Development
