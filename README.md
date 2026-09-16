@@ -31,13 +31,38 @@ omarchy pkg add rclone
 rclone config          # create a remote of type "drive", e.g. named "gdrive"
 ```
 
-rclone's shared Google Drive `client_id` is being retired in 2026, so create your own
-(see [rclone.org/drive](https://rclone.org/drive/#making-your-own-client-id)) and attach it to the remote:
+### Create your own Google client ID (required)
 
-```bash
-rclone config update gdrive client_id "YOUR_ID.apps.googleusercontent.com" client_secret "YOUR_SECRET"
-rclone config reconnect gdrive:
-```
+rclone's shared Google Drive `client_id` is being retired in 2026 and is heavily rate-limited, so the
+remote must use your own OAuth client. It takes about five minutes and does not require a paid account.
+
+1. Open the [Google Cloud Console](https://console.cloud.google.com/) with the Google account that owns
+   the Drive, and create a project (e.g. `rclone`) via the project selector at the top.
+2. **APIs & Services → Library**: search for **Google Drive API** and click **Enable**.
+3. **APIs & Services → OAuth consent screen** (also called *Google Auth Platform → Branding/Audience*):
+   - App name: `rclone`, user support email and developer contact: your address.
+   - Audience: **External**.
+   - Under **Audience → Test users**, add your own Gmail address. While the app stays in *Testing*
+     mode, only test users can authorize it — that is all you need for personal use.
+   - Optional: click **Publish app** to leave *Testing* mode. Otherwise Google expires the refresh
+     token after 7 days and rclone will ask you to reconnect weekly. Publishing a personal app does not
+     require verification as long as you only request the Drive scope for yourself.
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID**:
+   application type **Desktop app**, any name. Copy the **Client ID** and **Client secret**
+   (or download the JSON — the values are under `installed.client_id` / `installed.client_secret`).
+5. Attach them to the remote and re-authorize (a browser window opens; accept the
+   "Google hasn't verified this app" warning with *Continue*, since it is your own app):
+
+   ```bash
+   rclone config update gdrive client_id "YOUR_ID.apps.googleusercontent.com" client_secret "YOUR_SECRET"
+   rclone config reconnect gdrive:
+   rclone lsd gdrive:          # should list your top-level folders
+   ```
+
+If you create the remote from scratch with `rclone config`, paste the same client ID and secret when it
+asks for them. No resync is needed after changing the client ID — only the token changes.
+
+See also [rclone.org/drive — Making your own client_id](https://rclone.org/drive/#making-your-own-client-id).
 
 ## Install
 

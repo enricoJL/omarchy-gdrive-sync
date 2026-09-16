@@ -6,6 +6,49 @@ Plugin Omarchy (`com.github.enricojl.gdrive-sync`) qui remplace « Google Drive 
 synchronisation bidirectionnelle entre Google Drive et un dossier local avec `rclone bisync`,
 indicateur dans la barre, suivi en direct, problèmes visibles, choix du dossier.
 
+## Prérequis
+
+Omarchy fournit tout ce qu'il faut sauf **rclone**, à installer et configurer soi-même (l'installateur de
+plugins Omarchy n'installe jamais de paquet et n'exécute aucun script) :
+
+```bash
+omarchy pkg add rclone
+rclone config          # créer un distant de type « drive », par exemple nommé « gdrive »
+```
+
+### Créer son propre identifiant client Google (requis)
+
+Le `client_id` Google Drive partagé de rclone est retiré en 2026 et fortement limité en débit : le distant
+doit utiliser ton propre client OAuth. Ça prend environ cinq minutes et ne demande pas de compte payant.
+
+1. Ouvre la [console Google Cloud](https://console.cloud.google.com/) avec le compte Google propriétaire
+   du Drive et crée un projet (ex. `rclone`) via le sélecteur de projet en haut.
+2. **API et services → Bibliothèque** : cherche **Google Drive API** et clique **Activer**.
+3. **API et services → Écran de consentement OAuth** (aussi appelé *Google Auth Platform → Branding/Audience*) :
+   - Nom de l'application : `rclone` ; adresse d'assistance et contact développeur : ton adresse.
+   - Audience : **Externe**.
+   - Dans **Audience → Utilisateurs test**, ajoute ta propre adresse Gmail. Tant que l'application reste
+     en mode *Test*, seuls les utilisateurs test peuvent l'autoriser — c'est suffisant pour un usage personnel.
+   - Facultatif : clique **Publier l'application** pour sortir du mode *Test*. Sinon Google fait expirer le
+     jeton après 7 jours et rclone te redemandera de te reconnecter chaque semaine. Publier une application
+     personnelle ne demande pas de validation tant que tu n'utilises que la portée Drive pour toi-même.
+4. **API et services → Identifiants → Créer des identifiants → ID client OAuth** :
+   type **Application de bureau**, n'importe quel nom. Copie l'**ID client** et le **code secret du client**
+   (ou télécharge le JSON — les valeurs sont dans `installed.client_id` / `installed.client_secret`).
+5. Applique-les au distant et ré-autorise (une fenêtre de navigateur s'ouvre ; accepte l'avertissement
+   « Google n'a pas validé cette application » avec *Continuer*, puisque c'est ta propre application) :
+
+   ```bash
+   rclone config update gdrive client_id "TON_ID.apps.googleusercontent.com" client_secret "TON_SECRET"
+   rclone config reconnect gdrive:
+   rclone lsd gdrive:          # doit lister tes dossiers de premier niveau
+   ```
+
+Si tu crées le distant depuis zéro avec `rclone config`, colle le même ID client et le même secret quand il
+te les demande. Aucune resynchronisation n'est nécessaire après un changement de client ID — seul le jeton change.
+
+Voir aussi [rclone.org/drive — Making your own client_id](https://rclone.org/drive/#making-your-own-client-id).
+
 ## Composants
 
 | Fichier | Rôle |
