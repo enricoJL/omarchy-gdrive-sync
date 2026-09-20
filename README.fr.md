@@ -69,7 +69,7 @@ Voir aussi [rclone.org/drive — Making your own client_id](https://rclone.org/d
   et une ligne dans `history.jsonl`.
 - Pendant un passage, le panneau lit la progression en direct via l'API `rclone rc` (`127.0.0.1:5573`).
 - Avec `watchLocal`, `gdrive-sync-watch.service` exécute `inotifywait -m -r` sur le dossier local et lance
-  une synchro après 5 s de calme (30 s au maximum). Les événements produits par la synchro elle-même sont
+  une synchro après 20 s de calme (120 s au maximum). Les événements produits par la synchro elle-même sont
   ignorés, ainsi que les entrées cachées (`.obsidian/…`, `.git/…`) et les fichiers temporaires — ils sont
   quand même synchronisés au passage du minuteur. Google Drive n'offre pas de signal équivalent : les
   changements distants ne sont vus qu'au passage du minuteur.

@@ -111,7 +111,7 @@ Extra rclone flags live in `~/.config/gdrive-sync/config.json` under `extraArgs`
   and appends to `history.jsonl`.
 - While a run is active, the panel reads live stats from `rclone rc` on `127.0.0.1:5573`.
 - With `watchLocal` on, `gdrive-sync-watch.service` runs `inotifywait -m -r` on the local folder and
-  starts a sync after 5 s of quiet (30 s at most). Events caused by the sync itself are ignored, as are
+  starts a sync after 20 s of quiet (120 s at most). Events caused by the sync itself are ignored, as are
   hidden entries (`.obsidian/…`, `.git/…`) and temporary files — those still sync on the timer. There is
   no equivalent push signal from Google Drive, so remote changes are picked up by the timer only.
 - The widget settings in `shell.json` are the source of truth; the service mirrors them to

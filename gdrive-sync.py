@@ -29,8 +29,8 @@ UNIT_DIR = HOME / ".config" / "systemd" / "user"
 UNIT = "gdrive-sync"
 WATCH_UNIT = "gdrive-sync-watch"
 WATCH_STATE_FILE = STATE_DIR / "watch.json"
-WATCH_DEBOUNCE_SEC = 5
-WATCH_MAX_WAIT_SEC = 30
+WATCH_DEBOUNCE_SEC = 20
+WATCH_MAX_WAIT_SEC = 120
 # Hidden entries (e.g. .obsidian/workspace.json) change constantly; they still sync on the timer.
 WATCH_EXCLUDE = r"(/\.|\.partial$|~$|\.swp$|\.tmp$|\.crdownload$)"
 RC_ADDR = "127.0.0.1:5573"
@@ -607,6 +607,10 @@ def cmd_run(args):
         "--rc", "--rc-addr", RC_ADDR, "--rc-no-auth",
         "--use-json-log", "--log-file", str(log_path), "--log-level", "INFO", "--stats", "0",
         "--recover", "--resilient", "--max-lock", "2m",
+        # Obsidian keeps saving while a run is in flight; without a policy bisync renames
+        # both copies and drops the original. Newer wins, the loser gets .conflict1.
+        "--conflict-resolve", "newer", "--conflict-loser", "num",
+        "--fast-list",
         *[str(a) for a in cfg["extraArgs"]],
     ]
     if resync:
